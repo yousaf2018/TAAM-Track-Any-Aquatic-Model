@@ -23,7 +23,7 @@ This application was developed in the **[Laboratory of Professor Chung-Der Hsiao
   </a>
 </p>
 
-![TAAM Tool Overview](https://raw.githubusercontent.com/yousaf2018/TAAM/main/images/TAAM-GUI.png)
+![TAAM Tool Overview](https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/TAAM-GUI.png)
 *A snapshot of the TAAM interface*
 
 # 🌟 Key Features
