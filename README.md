@@ -231,6 +231,6 @@ See the `LICENSE` file for details.
 
 # 👨‍🔬 Author
 
-Developed by **\[Mahmood Yousaf\]**
+Developed by **Mahmood Yousaf**
 
 **Empowering aquatic research with accessible, high-performance AI.**
