@@ -181,19 +181,6 @@ analysis**.
 
   ------------------------------------------------------------------------------------------
 
-## Annotated Video
-
-A rendered **.mp4 video** featuring:
-
--   Semi-transparent polygon masks
--   ID tracking labels
--   Visual validation of AI performance
-
-------------------------------------------------------------------------
-
-# 🖥️ UI Screenshots
-
-*(Add screenshots here)*
 
 ### Annotation View
 
