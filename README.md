@@ -10,7 +10,7 @@ animals** (Zebrafish, Medaka, etc.) in laboratory environments. It bridges the g
 ![AI](https://img.shields.io/badge/AI-SAM3%20%2B%20YOLO-orange)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yousaf2018/TAAMM/main/images/android-chrome-512x512.png" alt="TAAM Logo" width="200">
+  <img src="https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/Logo.png" alt="EthoGrid Logo" width="200">
 </p>
 
 ## Acknowledgements
