@@ -1,0 +1,8 @@
+path: /mnt/Zebrafish_24TB/Mahmood-Yousaf-Data/TAAM-Track-Any-Aquatic-Model/TAAM_Workspace/TAAM_Workspace/Datasets/Experiment_v1
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: fish
+  1: shrimp
+  2: isopod
