@@ -67,7 +67,7 @@ from workers.training_worker import TrainingWorker
 class TAAMMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("TAAM - Track Any Animal Model")
+        self.setWindowTitle("TAAM - Track Any Aquatic Model")
         self.resize(1200, 850)
         
         self.project_dir = os.path.join(os.getcwd(), "TAAM_Data")

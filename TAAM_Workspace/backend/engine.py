@@ -197,39 +197,46 @@ class TAAMEngine:
         return ";".join([f"{p[0][0]},{p[0][1]}" for p in cv2.approxPolyDP(c, 0.005*cv2.arcLength(c, True), True)])
 
     def _generate_yolo_dataset(self, video_info_map, dataset_root, cb):
-        all_p = []
-        for v_path, csv_p in video_info_map.items():
-            df = pd.read_csv(csv_p); df.columns = df.columns.str.strip()
-            for fid in df["Global_Frame_ID"].unique(): all_p.append((v_path, fid, csv_p))
-        random.shuffle(all_p); sampled = all_p[:self.config['max_frames']]
-        split_map = {p: ("train" if i < len(sampled)*(self.config['tr']/100) else ("val" if i < len(sampled)*((self.config['tr']+self.config['va'])/100) else "test")) for i, p in enumerate(sampled)}
-        for s in ['train', 'val', 'test']:
-            os.makedirs(os.path.join(dataset_root, "images", s), exist_ok=True); os.makedirs(os.path.join(dataset_root, "labels", s), exist_ok=True)
-        for i, (v_path, f_idx, csv_p) in enumerate(sampled):
-            if self.stop_flag: return None
-            split = split_map[(v_path, f_idx, csv_p)]
-            df = pd.read_csv(csv_p); rows = df[df["Global_Frame_ID"]==f_idx]
-            img_src = rows.iloc[0]["Image_Path"]
-            shutil.copy(img_src, os.path.join(dataset_root, "images", split, os.path.basename(img_src)))
-            with open(os.path.join(dataset_root, "labels", split, os.path.basename(img_src).replace(".jpg", ".txt")), "w") as f_lbl:
-                cap = cv2.VideoCapture(v_path); fw, fh = int(cap.get(3)), int(cap.get(4)); cap.release()
-                for _, r in rows.iterrows():
-                    poly = str(r["Polygon_Coords"])
-                    if self.config['task_type'] == "Segmentation":
-                        f_lbl.write(f"0 " + " ".join([f"{float(p.split(',')[0])/fw:.6f} {float(p.split(',')[1])/fh:.6f}" for p in poly.split(';') if ',' in p]) + "\n")
-                    else:
-                        coords = [list(map(float, p.split(','))) for p in poly.split(';') if ',' in p]
-                        if coords:
-                            x, y = [c[0] for c in coords], [c[1] for c in coords]
-                            bw, bh = max(x)-min(x), max(y)-min(y)
-                            f_lbl.write(f"0 {(min(x)+bw/2)/fw:.6f} {(min(y)+bh/2)/fh:.6f} {bw/fw:.6f} {bh/fh:.6f}\n")
-            cb(50 + int((i/len(sampled))*40), f"YOLO Dataset: {split}")
+            all_p = []
+            for v_path, csv_p in video_info_map.items():
+                df = pd.read_csv(csv_p); df.columns = df.columns.str.strip()
+                for fid in df["Global_Frame_ID"].unique(): all_p.append((v_path, fid, csv_p))
+            random.shuffle(all_p); sampled = all_p[:self.config['max_frames']]
+            split_map = {p: ("train" if i < len(sampled)*(self.config['tr']/100) else ("val" if i < len(sampled)*((self.config['tr']+self.config['va'])/100) else "test")) for i, p in enumerate(sampled)}
             
-        yaml_p = os.path.join(dataset_root, "data.yaml")
-        yaml_content = f"path: {dataset_root}\ntrain: {os.path.join(dataset_root, 'images', 'train')}\nval: {os.path.join(dataset_root, 'images', 'val')}\ntest: {os.path.join(dataset_root, 'images', 'test')}\nnames:\n  0: aquatic_animal"
-        with open(yaml_p, "w") as f: f.write(yaml_content)
-        return yaml_p
-
+            for s in ['train', 'val', 'test']:
+                os.makedirs(os.path.join(dataset_root, "images", s), exist_ok=True); os.makedirs(os.path.join(dataset_root, "labels", s), exist_ok=True)
+                
+            for i, (v_path, f_idx, csv_p) in enumerate(sampled):
+                if self.stop_flag: return None
+                split = split_map[(v_path, f_idx, csv_p)]
+                df = pd.read_csv(csv_p); rows = df[df["Global_Frame_ID"]==f_idx]
+                img_src = rows.iloc[0]["Image_Path"]
+                shutil.copy(img_src, os.path.join(dataset_root, "images", split, os.path.basename(img_src)))
+                with open(os.path.join(dataset_root, "labels", split, os.path.basename(img_src).replace(".jpg", ".txt")), "w") as f_lbl:
+                    cap = cv2.VideoCapture(v_path); fw, fh = int(cap.get(3)), int(cap.get(4)); cap.release()
+                    for _, r in rows.iterrows():
+                        poly = str(r["Polygon_Coords"])
+                        cls_id = int(r["Class_ID"]) # EXTRACT CLASS ID FROM CSV
+                        if self.config['task_type'] == "Segmentation":
+                            f_lbl.write(f"{cls_id} " + " ".join([f"{float(p.split(',')[0])/fw:.6f} {float(p.split(',')[1])/fh:.6f}" for p in poly.split(';') if ',' in p]) + "\n")
+                        else:
+                            coords = [list(map(float, p.split(','))) for p in poly.split(';') if ',' in p]
+                            if coords:
+                                x, y = [c[0] for c in coords], [c[1] for c in coords]
+                                bw, bh = max(x)-min(x), max(y)-min(y)
+                                f_lbl.write(f"{cls_id} {(min(x)+bw/2)/fw:.6f} {(min(y)+bh/2)/fh:.6f} {bw/fw:.6f} {bh/fh:.6f}\n")
+                cb(50 + int((i/len(sampled))*40), f"YOLO: {split}")
+            
+            # MULTI-CLASS YAML CREATION
+            class_names = self.config.get('class_names', ['object'])
+            names_str = "\n".join([f"  {i}: {name}" for i, name in enumerate(class_names)])
+            
+            yaml_content = f"path: {dataset_root}\ntrain: {os.path.join(dataset_root, 'images', 'train')}\nval: {os.path.join(dataset_root, 'images', 'val')}\ntest: {os.path.join(dataset_root, 'images', 'test')}\nnames:\n{names_str}"
+            
+            yaml_p = os.path.join(dataset_root, "data.yaml")
+            with open(yaml_p, "w") as f: f.write(yaml_content)
+            return yaml_p
     def _split_video(self, cap, fps, w, h, out_dir):
         per = int(fps * self.config['chunk_duration']); paths, idx = [], 0
         while True:
