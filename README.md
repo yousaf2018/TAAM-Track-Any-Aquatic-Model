@@ -181,19 +181,6 @@ analysis**.
 
   ------------------------------------------------------------------------------------------
 
-## Annotated Video
-
-A rendered **.mp4 video** featuring:
-
--   Semi-transparent polygon masks
--   ID tracking labels
--   Visual validation of AI performance
-
-------------------------------------------------------------------------
-
-# 🖥️ UI Screenshots
-
-*(Add screenshots here)*
 
 ### Annotation View
 
@@ -231,6 +218,6 @@ See the `LICENSE` file for details.
 
 # 👨‍🔬 Author
 
-Developed by **\[Your Name / Lab Name\]**
+Developed by **Mahmood Yousaf**
 
 **Empowering aquatic research with accessible, high-performance AI.**
