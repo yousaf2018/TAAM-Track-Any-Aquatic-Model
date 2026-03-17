@@ -1,6 +1,0 @@
-path: /mnt/Zebrafish_24TB/Mahmood-Yousaf-Data/TAAM-Track-Any-Aquatic-Model/TAAM_Workspace/TAAM_Workspace/Datasets/Exp_1
-train: /mnt/Zebrafish_24TB/Mahmood-Yousaf-Data/TAAM-Track-Any-Aquatic-Model/TAAM_Workspace/TAAM_Workspace/Datasets/Exp_1/images/train
-val: /mnt/Zebrafish_24TB/Mahmood-Yousaf-Data/TAAM-Track-Any-Aquatic-Model/TAAM_Workspace/TAAM_Workspace/Datasets/Exp_1/images/val
-test: /mnt/Zebrafish_24TB/Mahmood-Yousaf-Data/TAAM-Track-Any-Aquatic-Model/TAAM_Workspace/TAAM_Workspace/Datasets/Exp_1/images/test
-names:
-  0: aquatic_animal
