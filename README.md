@@ -1,17 +1,26 @@
+
 # TAAM: Track Any Aquatic Model
 
-**TAAM** is a high-performance, professional-grade desktop application
-designed for the **automated tracking and behavioral analysis of aquatic
-animals** (Zebrafish, Medaka, etc.) in laboratory environments. It bridges the gap between **massive AI foundation models (SAM 3)** and
-**hyper-fast edge trackers (YOLO)** into a single, intuitive pipeline.
+**TAAM** is a high-performance, professional-grade desktop application designed for the automated tracking and behavioral analysis of aquatic animals (Zebrafish, Medaka, Daphnia, etc.) in laboratory environments.
+
+TAAM bridges the gap between large AI foundation models and real-time edge AI, combining:
+
+🧠 **SAM 3 (Teacher Model)** — few-shot learning & automatic dataset generation  
+⚡ **YOLO (Student Model)** — ultra-fast inference (100+ FPS) for real-time tracking
 
 ![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![AI](https://img.shields.io/badge/AI-SAM3%20%2B%20YOLO-orange)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
 <p align="center">
-  <img src="https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/Logo.png" alt="EthoGrid Logo" width="200">
+  <img src="https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/Logo.png" alt="TAAM Logo" width="200">
 </p>
+
+![TAAM GUI Snapshot](https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/TAAM-GUI.png)
+
+---
+
 
 ## Acknowledgements
 
@@ -23,201 +32,85 @@ This application was developed in the **[Laboratory of Professor Chung-Der Hsiao
   </a>
 </p>
 
-![TAAM Tool Overview](https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/TAAM-GUI.png)
-*A snapshot of the TAAM interface*
-
 # 🌟 Key Features
 
-## ⚡ High-Speed Pipeline
+- **Fully Automated AI Pipeline:** Train YOLO from just a few annotation clicks
+- **Teacher–Student Architecture:** SAM 3 generates accurate datasets → YOLO learns fast tracking
+- **YOLO-Only Mode:** Use existing SAM3 outputs to train YOLO directly
+- **Batch Video Processing:** Process dozens or hundreds of videos automatically
+- **Scientific Data Export:** High-precision CSVs with centroids, area, frame IDs, polygons, and image paths
+- **VRAM Optimization:** Video chunking + CPU offload for stable 4K processing
+- **Professional UI:** Dark-mode interface, side-by-side logging, project event monitoring
 
-Automatically trains a **custom YOLO model** from just a few
-user-defined annotation clicks.
+---
 
-## 🧠 Teacher-Student AI Architecture
+# 🚀 TAAM Workflow
 
-Uses **Segment Anything Model 3 (SAM 3)** as a **Teacher** to generate
-large, accurate datasets, and **YOLO** as a **Student** for **high-speed
-inference (100+ FPS)**.
+## 1️⃣ PRE-PROCESSING
+Split large lab videos into manageable segments for stable GPU processing.
 
-## 📦 Batch Processing
+## 2️⃣ ANNOTATION
+Draw bounding boxes on a few frames. TAAM records them as few-shot prompts.
 
-Load, split, and annotate **dozens of videos simultaneously**.
+## 3️⃣ AI TRAINING PIPELINE
 
-## 🔬 Scientific Data Export
+### 🧠 SAM 3 Stage
+- Propagates masks across videos
+- Tracks objects frame-by-frame
+- Exports scientific CSV measurements
+- Extracts frames to **sampling pool**: `Datasets/model_name/sampling_pool/`
 
-Generates high-precision CSV files containing:
+> **Note:** Images are named to preserve video traceability: `OriginalVideoName_frame_000123.jpg`
 
--   Centroids (X, Y)
--   Pixel Area
--   Global Frame IDs
--   Full Mask Polygon Coordinates
+### 🎯 YOLO Stage
+- Cleans old train/val/test splits (but keeps `sampling_pool` intact)  
+- Rebuilds dataset splits from sampling pool  
+- Skips deleted SAM outputs  
+- Handles first-time YOLO runs even if train/val/test folders do not exist  
+- Supports Detection or Segmentation training automatically
 
-## 🛠️ VRAM Optimization
+## 4️⃣ DEPLOYMENT
+Use trained models for high-speed tracking on new videos.
 
-Implements **automatic video chunking and CPU offloading** to handle
-long **4K videos on standard 12GB GPUs** without **Out-of-Memory (OOM)**
-crashes.
+---
 
-## 🖥️ Professional UI
+# 🗂️ Dataset Structure
 
-Modern **dark-mode interface** with:
+```
+Datasets/
+└── model_name/
+    ├── sampling_pool/
+    ├── images/
+    │   ├── train/
+    │   ├── val/
+    │   └── test/
+    ├── labels/
+    │   ├── train/
+    │   ├── val/
+    │   └── test/
+    └── data.yaml
+```
 
--   Side-by-side logging panels\
--   Project events monitoring\
--   AI engine terminal output\
--   Interactive hand-cursor navigation
-
-------------------------------------------------------------------------
-
-# 🚀 The 4-Step Workflow
-
-TAAM is designed for **researchers with zero coding experience**.
-
-## 1️⃣ PRE-PROCESS
-
-Split massive laboratory recordings into manageable segments\
-(e.g., **60-second chunks**) to optimize memory and processing speed.
-
-## 2️⃣ ANNOTATE
-
-Navigate to **3--5 frames** and draw a **bounding box** around the
-target animals.\
-TAAM records these as **few-shot prompts**.
-
-## 3️⃣ TRAIN
-
-Launch the automated pipeline.
-
-SAM 3 will:
-
--   Propagate annotations across the whole video
--   Build a randomized training dataset
--   Train a **custom YOLO model (Detection or Segmentation)**
-
-## 4️⃣ DEPLOY
-
-Select your **versioned model** from the sidebar and run **high-speed
-tracking** on any new video source.
-
-------------------------------------------------------------------------
-
-# 🏗️ Project Structure
-
-For TAAM to work, the **SAM 3 repository must be placed in the root
-directory**.
-
-    TAAM_Workspace/
-    │
-    ├── main.py                    # Application Entry Point
-    ├── sam3/                      # SAM 3 Repository (Root Directory)
-    │
-    ├── ui/
-    │   └── video_selector.py      # High-performance drawing canvas
-    │
-    ├── backend/
-    │   └── engine.py              # Core AI & Mathematical Logic
-    │
-    ├── workers/
-    │   ├── pipeline_worker.py     # Threading for AI tasks
-    │   └── splitter_worker.py     # Threading for pre-processing
-    │
-    ├── utils/
-    │   └── stream_logger.py       # Terminal-to-GUI Bridge
-    │
-    └── TAAM_Workspace/            # User-defined Data Storage
-                                   # (CSVs, Models, Videos)
-
-------------------------------------------------------------------------
+---
 
 # 🛠️ Installation
 
-## 1️⃣ Requirements
-
-  Component   Requirement
-  ----------- ----------------------------------------------------------
-  OS          Windows 10/11 or Ubuntu 20.04+
-  GPU         NVIDIA GPU (Minimum **8GB VRAM**, **12GB+ recommended**)
-  Python      3.10 or 3.11
-
-------------------------------------------------------------------------
-
-## 2️⃣ Setup Environment
-
-``` bash
-# Clone the repository
+```bash
 git clone https://github.com/YourUsername/TAAM.git
 cd TAAM
-
-# Create virtual environment
 conda create -n taam python=3.10
 conda activate taam
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-------------------------------------------------------------------------
-
-## 3️⃣ Add SAM 3
-
-Ensure your **local copy of the SAM 3 repository** is placed inside the
-root folder:
-
-    /sam3
-
-------------------------------------------------------------------------
-
-# 📊 Scientific Output
-
-TAAM ensures the generated data is **ready for publication-level
-analysis**.
-
-## Precision CSV
-
-  ------------------------------------------------------------------------------------------
-  Global_Frame_ID   Object_ID   Centroid_X   Centroid_Y   Size_Pixels   Polygon_Coords
-  ----------------- ----------- ------------ ------------ ------------- --------------------
-  1240              1           845.2        412.5        12400         800,400;810,405...
-
-  ------------------------------------------------------------------------------------------
-
-
-### Annotation View
-
-High-precision **bounding box manager** with **Ctrl+C / Ctrl+V**
-support.
-
-### Engine Monitor
-
-Real-time **TQDM progress bars** and **GPU status streamed directly to
-the GUI**.
-
-------------------------------------------------------------------------
-
-# 🤝 Contributing
-
-Contributions to improve:
-
--   Aquatic tracking logic
--   Additional pre-trained models
--   Performance optimization
-
-are welcome.
-
-Please **open an issue** or **submit a pull request**.
-
-------------------------------------------------------------------------
+---
 
 # 📄 License
+MIT License
 
-This project is licensed under the **MIT License**.
-
-See the `LICENSE` file for details.
-
-------------------------------------------------------------------------
+---
 
 # 👨‍🔬 Author
-
-Developed by **Mahmood Yousaf**
-
-**Empowering aquatic research with accessible, high-performance AI.**
+Mahmood Yousaf  
+PhD Researcher — Biomedical Engineering  
+Chung Yuan Christian University, Taiwan
