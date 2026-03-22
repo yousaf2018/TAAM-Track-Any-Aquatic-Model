@@ -14,10 +14,10 @@ TAAM bridges the gap between large AI foundation models and real-time edge AI, c
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 <p align="center">
-  <img src="https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/Logo.png" alt="TAAM Logo" width="200">
+  <img src="https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/source_code/assets/Logo.png" alt="TAAM Logo" width="200">
 </p>
 
-![TAAM GUI Snapshot](https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/TAAM_Workspace/assets/TAAM-GUI.png)
+![TAAM GUI Snapshot](https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model/blob/main/source_code/assets/TAAM-GUI.png)
 
 ---
 
