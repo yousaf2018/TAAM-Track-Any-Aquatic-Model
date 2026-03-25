@@ -323,33 +323,67 @@ class TAAMEngine:
 
     def log(self, msg):
         if self.log_app: self.log_app.emit(msg)
+        else: print(msg)
 
     def load_sam3(self):
         global GLOBAL_SAM_MODEL, GLOBAL_SAM_PREDICTOR
-        if GLOBAL_SAM_MODEL is not None:
-            self.predictor = GLOBAL_SAM_PREDICTOR
-            return True
         try:
+            if GLOBAL_SAM_MODEL is not None:
+                self.predictor = GLOBAL_SAM_PREDICTOR
+                self.log("AI: SAM3 already loaded in memory.")
+                return True
+
             from sam3.model_builder import build_sam3_video_model
-            self.log("AI: Loading SAM 3 Architecture...")
+            self.log("AI: Loading SAM3 Architecture...")
             with torch.inference_mode():
                 GLOBAL_SAM_MODEL = build_sam3_video_model()
                 GLOBAL_SAM_PREDICTOR = GLOBAL_SAM_MODEL.tracker
                 GLOBAL_SAM_PREDICTOR.backbone = GLOBAL_SAM_MODEL.detector.backbone
             self.predictor = GLOBAL_SAM_PREDICTOR
+            self.log("AI: SAM3 Loaded Successfully.")
             return True
         except Exception as e:
             self.log(f"AI: ❌ Failed to load SAM3: {e}")
+            self._free_sam3_memory()
             return False
 
+    def _free_sam3_memory(self):
+        """Safely delete SAM3 from GPU memory."""
+        global GLOBAL_SAM_MODEL, GLOBAL_SAM_PREDICTOR
+        try:
+            if GLOBAL_SAM_MODEL is not None:
+                self.log("AI: Releasing SAM3 from GPU memory...")
+                del GLOBAL_SAM_MODEL
+                GLOBAL_SAM_MODEL = None
+            if GLOBAL_SAM_PREDICTOR is not None:
+                del GLOBAL_SAM_PREDICTOR
+                GLOBAL_SAM_PREDICTOR = None
+            self.predictor = None
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            self.log("AI: SAM3 memory cleared successfully.")
+        except Exception as e:
+            self.log(f"AI: Error during SAM3 memory cleanup: {e}")
+
     def run_full_pipeline(self, video_paths, annotations_map, model_name, progress_callback):
-        video_info = self.run_sam3_only(video_paths, annotations_map, model_name, progress_callback)
-        if video_info and not self.stop_flag:
-            return self.run_yolo_only(video_info, model_name, progress_callback)
-        return False
+        try:
+            video_info = self.run_sam3_only(video_paths, annotations_map, model_name, progress_callback)
+            # Free memory after SAM3 tracking
+            self._free_sam3_memory()
+            if video_info and not self.stop_flag:
+                return self.run_yolo_only(video_info, model_name, progress_callback)
+            return False
+        except Exception as e:
+            self.log(f"PIPELINE ERROR: {e}")
+            self._free_sam3_memory()
+            return False
 
     def run_sam3_only(self, video_paths, annotations_map, model_name, progress_callback):
         try:
+            if not self.load_sam3():
+                return None
+
             exp_root = os.path.join(self.workspace, "Experiments", model_name)
             ds_dir = os.path.abspath(os.path.join(self.workspace, "Datasets", model_name))
             pool_dir = os.path.join(ds_dir, "sampling_pool")
@@ -359,14 +393,11 @@ class TAAMEngine:
             for v_idx, v_path in enumerate(video_paths):
                 if self.stop_flag: break
 
-                # ✅ Keep full original filename (without altering structure)
-                v_filename_full = os.path.basename(v_path)              # full filename with extension
-                v_name = os.path.splitext(v_filename_full)[0]           # original behavior preserved
-
+                v_filename_full = os.path.basename(v_path)
+                v_name = os.path.splitext(v_filename_full)[0]
                 self.log(f"PROJECT: Tracking {v_name} ({v_idx+1}/{len(video_paths)})")
                 v_exp_dir = os.path.join(exp_root, v_name); os.makedirs(v_exp_dir, exist_ok=True)
 
-                # pass full filename so sampling_pool can use it if needed
                 csv_p = self._process_video_sam3(
                     v_path,
                     annotations_map.get(v_path, {}),
@@ -379,8 +410,14 @@ class TAAMEngine:
                     video_info[v_path] = csv_p
 
             return video_info
+        except RuntimeError as re:
+            # Likely CUDA OOM
+            self.log(f"SAM3 MEMORY ERROR: {re}")
+            self._free_sam3_memory()
+            return None
         except Exception as e:
             self.log(f"SAM3 ERROR: {e}")
+            self._free_sam3_memory()
             return None
 
     def run_yolo_only(self, video_info, model_name, progress_callback):
@@ -390,18 +427,15 @@ class TAAMEngine:
 
             self.log("SYSTEM: Preparing YOLO dataset folders...")
 
-            # ✅ Safe clean (first-run safe)
             for sub in ["images", "labels", "train", "val", "test"]:
                 target = os.path.join(ds_dir, sub)
                 if os.path.exists(target):
                     shutil.rmtree(target)
 
-            # ✅ RESTORE AUTO DISCOVERY FOR YOLO-ONLY MODE
             if not video_info:
                 self.log("🔍 YOLO-Only Mode: Discovering existing SAM3 outputs...")
                 video_info = self._discover_existing_data(model_name)
 
-            # ✅ Validate existing CSVs
             clean_video_info = {}
             for v_path, csv_p in (video_info or {}).items():
                 if os.path.exists(csv_p):
@@ -449,18 +483,16 @@ class TAAMEngine:
         except Exception as e:
             self.log(f"YOLO ERROR: {e}")
             return False
+
     def _generate_yolo_dataset(self, video_info_map, dataset_root, cb):
         all_p = []
 
-        # Collect valid frames only
         for v_path, csv_p in video_info_map.items():
             if not os.path.exists(csv_p):
                 continue
 
             df = pd.read_csv(csv_p)
             df.columns = df.columns.str.strip()
-
-            # Skip if user deleted pooled images
             df = df[df["Image_Path"].apply(os.path.exists)]
             if df.empty:
                 continue
@@ -487,7 +519,6 @@ class TAAMEngine:
                 return None
 
             split = "train" if i < tr_lim else ("val" if i < va_lim else "test")
-
             df = pd.read_csv(csv_p)
             rows = df[df["Global_Frame_ID"] == f_idx]
             if rows.empty:
@@ -500,10 +531,8 @@ class TAAMEngine:
             tmp_img = cv2.imread(img_src)
             fh, fw = tmp_img.shape[:2]
 
-            # ✅ Use ORIGINAL VIDEO NAME in dataset image name
             vid_name = os.path.splitext(os.path.basename(v_path))[0]
             base_n = f"{vid_name}_frame_{int(f_idx):06d}.jpg"
-
             shutil.copy(img_src, os.path.join(dataset_root, "images", split, base_n))
 
             with open(os.path.join(dataset_root, "labels", split, base_n.replace(".jpg", ".txt")), "w") as f_lbl:
@@ -535,6 +564,7 @@ class TAAMEngine:
                 f.write(f"  {idx}: {name}\n")
 
         return yaml_p
+
     def _discover_existing_data(self, model_name):
         discovered = {}
         search_path = os.path.join(self.workspace, "Experiments", model_name)
@@ -543,8 +573,8 @@ class TAAMEngine:
             v_name = os.path.basename(cp).replace("_data.csv", "")
             discovered[v_name] = cp
         return discovered
-    # --- REST OF METHODS: _process_video_sam3, _track_chunk, _render, _get_centroid_area, _get_polygon_str, _split_video, _stitch ---
-    # These remain 100% unchanged from your working version.
+
+    # --- SAM3 Video Processing ---
     def _process_video_sam3(self, v_path, ann, out_dir, pool_dir, cb):
         temp, proc = os.path.join(out_dir, "temp"), os.path.join(out_dir, "proc")
         os.makedirs(temp, exist_ok=True); os.makedirs(proc, exist_ok=True)
@@ -589,7 +619,6 @@ class TAAMEngine:
         cap_read = cv2.VideoCapture(cp)
         frame_count = int(cap_read.get(7))
 
-        # ✅ derive original video name safely from CSV filename
         video_base = os.path.splitext(os.path.basename(csv_path))[0].replace("_data", "")
 
         with open(csv_path, 'a', newline='') as f_csv:
@@ -604,14 +633,11 @@ class TAAMEngine:
 
             for f_idx, oids, _, masks, _ in gen:
                 ret, frame = cap_read.read()
-                if not ret:
-                    break
+                if not ret: break
 
-                # ✅ FIXED: proper sampling pool image naming
                 global_frame_id = (c_idx * frame_count) + f_idx
                 img_name = f"{video_base}_frame_{int(global_frame_id):06d}.jpg"
                 img_p = os.path.abspath(os.path.join(pool_dir, img_name))
-
                 cv2.imwrite(img_p, frame)
 
                 vis_data[f_idx] = {}
@@ -644,6 +670,7 @@ class TAAMEngine:
                     }
 
         return next_prompts
+
     def _render(self, inp, out, fps, data):
         cap = cv2.VideoCapture(inp); w, h = int(cap.get(3)), int(cap.get(4))
         writer = cv2.VideoWriter(out, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
@@ -668,6 +695,7 @@ class TAAMEngine:
         if not cnts: return ""
         c = max(cnts, key=cv2.contourArea)
         return ";".join([f"{p[0][0]},{p[0][1]}" for p in cv2.approxPolyDP(c, 0.005*cv2.arcLength(c, True), True)])
+
     def _split_video(self, cap, fps, w, h, out_dir):
         per = int(fps * self.config['chunk_duration']); paths, idx = [], 0
         while True:
@@ -676,17 +704,17 @@ class TAAMEngine:
             out_f = os.path.abspath(os.path.join(out_dir, f"c_{idx:03d}.mp4"))
             writer = cv2.VideoWriter(out_f, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
             cnt = 0
-            writer.write(frame)
-            while cnt < per - 1:
+            while cnt < per:
+                if frame is None: break
+                writer.write(frame); cnt += 1
                 ret, frame = cap.read()
                 if not ret: break
-                writer.write(frame); cnt += 1
             writer.release(); paths.append(out_f); idx += 1
         return paths
 
-    def _stitch(self, d, out, fps, w, h):
-        files = sorted(glob.glob(os.path.join(d, "*.mp4")))
-        writer = cv2.VideoWriter(out, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+    def _stitch(self, src_dir, out_path, fps, w, h):
+        files = sorted(glob.glob(os.path.join(src_dir, "*.mp4")))
+        writer = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
         for f in files:
             cap = cv2.VideoCapture(f)
             while True:

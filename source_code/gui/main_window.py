@@ -24,10 +24,10 @@ class TAAMMainWindow(QMainWindow):
         self.worker = None 
         self.sw = None 
         
-        # Professional Styling
+        # Apply Professional High-Contrast Styling
         self.setStyleSheet(self.get_style())
         
-        # Terminal Redirection
+        # Terminal Redirection for Blue Panel
         self.stdout_redirect = StreamRedirector(sys.stdout)
         self.stderr_redirect = StreamRedirector(sys.stderr)
         sys.stdout = self.stdout_redirect; sys.stderr = self.stderr_redirect
@@ -45,18 +45,31 @@ class TAAMMainWindow(QMainWindow):
             QMainWindow { background-color: #050505; }
             QWidget { background-color: #050505; color: #efefef; font-family: 'Segoe UI'; }
             QFrame#Sidebar { background-color: #0d0d0d; border-right: 1px solid #333; }
+            
+            /* Action Buttons */
             QPushButton { background-color: #0078d4; border: none; padding: 10px; font-weight: bold; border-radius: 4px; color: white; }
             QPushButton:hover { background-color: #008af0; }
-            QPushButton#CancelBtn { background-color: #d9534f; color: white; font-weight: bold; border: 1px solid #b52b27; }
+            
+            /* RED STOP BUTTON - PROFESSIONAL HIGHLIGHT */
+            QPushButton#CancelBtn { 
+                background-color: #d9534f; 
+                color: white; 
+                font-weight: bold; 
+                border: 1px solid #b52b27; 
+            }
             QPushButton#CancelBtn:hover { background-color: #c9302c; }
             QPushButton#CancelBtn:disabled { background-color: #222; color: #555; border: none; }
+            
             QLineEdit, QSpinBox, QComboBox, QDoubleSpinBox { background: #1a1a1a; border: 1px solid #333; padding: 5px; color: #39FF14; }
             QTextEdit { background-color: #000; font-family: 'Consolas'; border: 1px solid #333; font-size: 11px; }
+            
             #LogApp { color: #39FF14; } #LogSAM { color: #4db8ff; }
             QLabel#StatVal { color: #ffc107; font-weight: bold; font-size: 18px; }
             QLabel#PathBox { color: #39FF14; font-family: 'Consolas'; font-size: 10px; background: #111; padding: 5px; border-radius: 4px; }
+            
             QProgressBar { height: 12px; border-radius: 6px; background: #111; text-align: center; }
             QProgressBar::chunk { background-color: #0078d4; }
+            
             QTabWidget::pane { border: 1px solid #222; top: -1px; background: #0a0a0a; }
             QTabBar::tab { background: #111; padding: 15px 30px; border: 1px solid #222; margin-right: 2px; }
             QTabBar::tab:selected { background: #0078d4; color: white; }
@@ -74,7 +87,7 @@ class TAAMMainWindow(QMainWindow):
         central = QWidget(); self.setCentralWidget(central)
         layout = QHBoxLayout(central); layout.setContentsMargins(0,0,0,0)
         
-        # --- SIDEBAR ---
+        # --- SIDEBAR (CONTROL CENTER) ---
         sidebar = QFrame(); sidebar.setObjectName("Sidebar"); sidebar.setFixedWidth(360)
         side_lay = QVBoxLayout(sidebar)
         side_lay.addWidget(QLabel("🐬 TAAM CONTROL CENTER"))
@@ -105,11 +118,11 @@ class TAAMMainWindow(QMainWindow):
         
         # TAB 1: SPLIT
         t0 = QWidget(); l0 = QVBoxLayout(t0)
-        l0.addWidget(QLabel("Video Pre-Processor: Splits videos from the sidebar queue.", wordWrap=True))
+        l0.addWidget(QLabel("1. Pre-Processor: Splits all videos currently in the 'Control Center' sidebar queue.", wordWrap=True))
         slay = QFormLayout()
         self.spin_split_sec = QSpinBox(); self.spin_split_sec.setRange(1, 999999); self.spin_split_sec.setValue(60)
         self.lbl_split_out = QLabel(os.path.join(self.workspace, "Splitted_Videos")); self.lbl_split_out.setObjectName("PathBox")
-        slay.addRow("Split Seconds:", self.spin_split_sec); slay.addRow("Save To:", self.lbl_split_out)
+        slay.addRow("Split Seconds:", self.spin_split_sec); slay.addRow("Target Path:", self.lbl_split_out)
         l0.addLayout(slay); l0.addWidget(self._btn("📁 Change Split Folder", self.set_split_out))
         br_split = QHBoxLayout()
         self.btn_run_split = self._btn("✂️ START BATCH SPLITTING", self.run_video_splitter); self.btn_run_split.setFixedHeight(70)
@@ -124,7 +137,9 @@ class TAAMMainWindow(QMainWindow):
         c_lay = QHBoxLayout(); c_lay.addWidget(QLabel("Define Classes (comma sep):"))
         self.edit_classes = QLineEdit("zebrafish, medaka"); self.edit_classes.textChanged.connect(self.update_class_dropdown)
         c_lay.addWidget(self.edit_classes); l1.addLayout(c_lay)
-        tool_lay = QHBoxLayout(); tool_lay.addWidget(QLabel("Active:")); self.combo_cls = QComboBox(); tool_lay.addWidget(self.combo_cls)
+        tool_lay = QHBoxLayout(); tool_lay.addWidget(QLabel("Active Label:")); self.combo_cls = QComboBox()
+        self.combo_cls.currentIndexChanged.connect(self.change_active_annotation_class)
+        tool_lay.addWidget(self.combo_cls)
         tool_lay.addWidget(self._btn("Clear Frame", lambda: self.video_ui.clear_current_frame())); tool_lay.addStretch()
         l1.addLayout(tool_lay)
         self.video_ui = VideoSelectorWidget(); self.video_ui.selection_changed.connect(self.on_ann_change)
@@ -135,7 +150,7 @@ class TAAMMainWindow(QMainWindow):
 
         # TAB 3: TRAIN
         t2 = QWidget(); l2 = QVBoxLayout(t2)
-        self.edit_train_name = QLineEdit("Exp_1"); l2.addWidget(QLabel("Experiment/Version Name:")); l2.addWidget(self.edit_train_name)
+        self.edit_train_name = QLineEdit("Exp_1"); l2.addWidget(QLabel("Experiment/Model Name:")); l2.addWidget(self.edit_train_name)
         cfg_box = QGroupBox("Optimization & YOLO Training Parameters"); cfg_lay = QFormLayout()
         self.combo_task = QComboBox(); self.combo_task.addItems(["Detection", "Segmentation"]); self.combo_task.currentTextChanged.connect(self.update_yolo_dropdown)
         self.combo_yolo_ver = QComboBox(); self.edit_weights = QLineEdit(""); self.spin_epochs = QSpinBox(); self.spin_epochs.setRange(1, 999999); self.spin_epochs.setValue(25)
@@ -144,15 +159,19 @@ class TAAMMainWindow(QMainWindow):
         cfg_lay.addRow("Task:", self.combo_task); cfg_lay.addRow("Model:", self.combo_yolo_ver); cfg_lay.addRow("SAM3 Batch:", self.spin_sam_batch); cfg_lay.addRow("SAM3 Chunk:", self.spin_sam_chunk); cfg_lay.addRow("Base Weights:", self.edit_weights); cfg_lay.addRow("", self._btn("📁 Browse .pt", self.browse_custom_pt)); cfg_lay.addRow("Epochs:", self.spin_epochs); cfg_lay.addRow("Batch:", self.spin_batch_yolo); cfg_lay.addRow("Img Size:", self.spin_imgsz); cfg_lay.addRow("Max Frames:", self.spin_max)
         cfg_box.setLayout(cfg_lay); l2.addWidget(cfg_box); self.update_yolo_dropdown()
         
-        btn_lay = QVBoxLayout()
+        br = QHBoxLayout()
+        # LAUNCH BUTTON
         self.btn_run_full = self._btn("🚀 LAUNCH FULL AUTO PIPELINE", lambda: self.start_pipeline("FULL")); self.btn_run_full.setFixedHeight(70)
+        # STOP BUTTON - SIZE MATCHED TO LAUNCH BUTTON
+        self.btn_stop = self._btn("🛑 STOP TASK", self.stop_pipeline, "CancelBtn")
+        self.btn_stop.setFixedHeight(70); self.btn_stop.setEnabled(False)
+        br.addWidget(self.btn_run_full, 2); br.addWidget(self.btn_stop, 1)
+
         row_btns = QHBoxLayout()
         row_btns.addWidget(self._btn("🔍 STAGE 1: SAM3 ONLY", lambda: self.start_pipeline("SAM3_ONLY")))
         row_btns.addWidget(self._btn("🔥 STAGE 2: YOLO ONLY", lambda: self.start_pipeline("YOLO_ONLY")))
-        self.btn_stop = self._btn("🛑 STOP TASK", self.stop_pipeline, "CancelBtn")
-        self.btn_stop.setEnabled(False)
-        btn_lay.addWidget(self.btn_run_full); btn_lay.addLayout(row_btns); btn_lay.addWidget(self.btn_stop)
-        l2.addLayout(btn_lay); l2.addStretch()
+        
+        l2.addLayout(br); l2.addLayout(row_btns); l2.addStretch()
         self.tabs.addTab(t2, "3. TRAIN")
 
         # TAB 4: ADVANCED ARENA (ROI)
@@ -215,45 +234,56 @@ class TAAMMainWindow(QMainWindow):
     def set_workspace(self):
         d = QFileDialog.getExistingDirectory(self, "Workspace")
         if d: self.workspace = os.path.abspath(d); self.lbl_ws.setText(self.workspace); self.refresh_model_list(); self.lbl_split_out.setText(os.path.join(self.workspace, "Splitted_Videos"))
+
     def set_split_out(self):
         d = QFileDialog.getExistingDirectory(self, "Folder"); self.lbl_split_out.setText(d) if d else None
     def browse_custom_pt(self):
         p, _ = QFileDialog.getOpenFileName(self, "Weights", "", "Weights (*.pt)"); self.edit_weights.setText(p) if p else None
     def refresh_model_list(self):
         self.list_models.clear(); self.list_models.addItems([p.split(os.sep)[-3] for p in glob.glob(os.path.join(self.workspace, "Models", "*/weights/best.pt"))])
+
     def update_class_dropdown(self):
-        self.combo_cls.clear(); self.combo_cls.addItems([c.strip() for c in self.edit_classes.text().split(',')]); self.video_ui.set_current_class(0)
-    
+        classes = [c.strip() for c in self.edit_classes.text().split(',')]
+        self.combo_cls.clear(); self.combo_cls.addItems(classes)
+        if classes: self.video_ui.set_current_class(0)
+    def change_active_annotation_class(self, idx):
+        if idx >= 0: self.video_ui.set_current_class(idx)
+
     def add_videos(self):
         ps, _ = QFileDialog.getOpenFileNames(self, "Add", "", "Videos (*.mp4 *.avi)")
         for p in ps:
-            if p not in self.video_data:
-                cap = cv2.VideoCapture(p); self.video_data[p] = int(cap.get(7)); cap.release(); self.list_vids.addItem(p)
+            if p not in self.video_data: cap = cv2.VideoCapture(p); self.video_data[p] = int(cap.get(7)); cap.release(); self.list_vids.addItem(p)
         if ps: self.list_vids.setCurrentRow(self.list_vids.count()-1)
 
     def run_video_splitter(self):
         vids = [self.list_vids.item(i).text() for i in range(self.list_vids.count())]
-        if not vids: QMessageBox.warning(self, "TAAM", "Add videos to sidebar first."); return
+        if not vids: return
         self.log_app.clear(); self.btn_run_split.setEnabled(False); self.btn_stop_split.setEnabled(True)
         self.sw = SplitterWorker(vids, self.spin_split_sec.value(), self.lbl_split_out.text())
-        self.sw.log_signal.connect(self.log_app.append); self.sw.finished_signal.connect(lambda m: (self.btn_run_split.setEnabled(True), self.btn_stop_split.setEnabled(False))); self.sw.start()
+        self.sw.log_signal.connect(self.log_app.append); self.sw.finished_signal.connect(self.on_split_done); self.sw.start()
 
     def stop_splitter(self):
         if self.sw: self.sw.stop()
+    def on_split_done(self, m):
+        self.btn_run_split.setEnabled(True); self.btn_stop_split.setEnabled(False); QMessageBox.information(self, "Splitter", m)
+
     def remove_video(self):
-        idx = self.list_vids.currentRow(); 
+        idx = self.list_vids.currentRow()
         if idx >= 0: p = self.list_vids.item(idx).text(); self.project_annotations.pop(p, None); self.list_vids.takeItem(idx)
+
     def load_preview(self, row):
         if row < 0: return
         self.current_video = self.list_vids.item(row).text(); cap = cv2.VideoCapture(self.current_video); total = int(cap.get(7)); self.slider.setRange(0, total-1)
         self.video_ui.annotations = self.project_annotations.get(self.current_video, {})
         ret, f = cap.read(); self.video_ui.set_current_frame(0, f); self.roi_designer.set_frame(f); cap.release(); self.on_ann_change(); self.lbl_frame_info.setText(f"Frame: 0 / {total}")
+
     def seek(self, val):
         if not hasattr(self, 'current_video'): return
         cap = cv2.VideoCapture(self.current_video); cap.set(1, val); ret, f = cap.read(); self.video_ui.set_current_frame(val, f); self.roi_designer.set_frame(f); cap.release(); self.lbl_frame_info.setText(f"Frame: {val} / {self.video_data.get(self.current_video, 0)}")
+
     def stop_pipeline(self):
         if hasattr(self, 'worker') and self.worker: self.worker.stop(); self.btn_stop.setEnabled(False); self.btn_adv_stop.setEnabled(False)
-    
+
     def start_pipeline(self, mode):
         vids = [self.list_vids.item(i).text() for i in range(self.list_vids.count())]
         if not vids: return
@@ -269,14 +299,12 @@ class TAAMMainWindow(QMainWindow):
 
     def start_tracking(self):
         try:
-            video_count = self.list_vids.count()
-            model_count = self.list_models.count()
+            video_count = self.list_vids.count(); model_count = self.list_models.count()
             if video_count == 0 or model_count == 0 or not self.roi_designer.shapes:
                 QMessageBox.warning(self, "TAAM", "Required: Videos + Models + ROIs"); return
             vids = [self.list_vids.item(i).text() for i in range(video_count)]
             models = [self.list_models.item(i).text() for i in range(model_count)]
             
-            # Serialize ROIs
             clean_rois = []
             for s in self.roi_designer.shapes:
                 item = {'type': str(s['type']), 'x': float(s['points'].x()), 'y': float(s['points'].y()), 'w': float(s['points'].width()), 'h': float(s['points'].height()), 'angle': float(s.get('angle', 0))}
