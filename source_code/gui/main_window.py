@@ -111,7 +111,13 @@ class TAAMMainWindow(QMainWindow):
         sl = QFormLayout(); self.lbl_f = QLabel("0"); self.lbl_f.setObjectName("StatVal"); self.lbl_b = QLabel("0"); self.lbl_b.setObjectName("StatVal")
         sl.addRow("Annotated Vids:", self.lbl_f); sl.addRow("Total Bboxes:", self.lbl_b)
         stat_group.setLayout(sl); side_lay.addWidget(stat_group); side_lay.addStretch(); layout.addWidget(sidebar)
-
+        # Add this to the Sidebar (side_lay)
+        ann_mgmt_group = QGroupBox("Annotation Management")
+        am_lay = QVBoxLayout()
+        am_lay.addWidget(self._btn("💾 Save All Annotations", self.save_project_annotations))
+        am_lay.addWidget(self._btn("📂 Load Annotations File", self.load_project_annotations))
+        ann_mgmt_group.setLayout(am_lay)
+        side_lay.addWidget(ann_mgmt_group)
         # --- MAIN TABS ---
         content = QVBoxLayout(); content.setContentsMargins(15,15,15,15)
         self.tabs = QTabWidget(); self.tabs.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -286,10 +292,28 @@ class TAAMMainWindow(QMainWindow):
 
     def load_preview(self, row):
         if row < 0: return
-        self.current_video = self.list_vids.item(row).text(); cap = cv2.VideoCapture(self.current_video); total = int(cap.get(7)); self.slider.setRange(0, total-1)
-        self.video_ui.annotations = self.project_annotations.get(self.current_video, {})
-        ret, f = cap.read(); self.video_ui.set_current_frame(0, f); self.roi_designer.set_frame(f); cap.release(); self.on_ann_change(); self.lbl_frame_info.setText(f"Frame: 0 / {total}")
-
+        # 1. Update current path and metadata
+        self.current_video = self.list_vids.item(row).text()
+        cap = cv2.VideoCapture(self.current_video)
+        total = int(cap.get(7))
+        self.slider.setRange(0, total - 1)
+        
+        # 2. SYNC: Pull annotations from global storage for this specific video
+        if self.current_video not in self.project_annotations:
+            self.project_annotations[self.current_video] = {}
+        
+        self.video_ui.annotations = self.project_annotations[self.current_video]
+        
+        # 3. Refresh Visuals
+        ret, f = cap.read()
+        self.video_ui.set_current_frame(0, f)
+        self.roi_designer.set_frame(f)
+        cap.release()
+        
+        # 4. Update Stats and UI Labels
+        self.on_ann_change() 
+        self.lbl_frame_info.setText(f"Frame: 0 / {total}")
+        self.video_ui.update() # Force redraw of boxes
     def seek(self, val):
         if not hasattr(self, 'current_video'): return
         cap = cv2.VideoCapture(self.current_video); cap.set(1, val); ret, f = cap.read(); self.video_ui.set_current_frame(val, f); self.roi_designer.set_frame(f); cap.release(); self.lbl_frame_info.setText(f"Frame: {val} / {self.video_data.get(self.current_video, 0)}")
@@ -339,6 +363,81 @@ class TAAMMainWindow(QMainWindow):
     def delete_model(self):
         item = self.list_models.currentItem()
         if item and QMessageBox.question(self, 'Confirm', f"Delete {item.text()}?") == QMessageBox.StandardButton.Yes: shutil.rmtree(os.path.join(self.workspace, "Models", item.text()), ignore_errors=True); self.refresh_model_list()
+    def save_project_annotations(self):
+        """Saves all current annotations and class names to a JSON file."""
+        if not self.project_annotations:
+            QMessageBox.warning(self, "Save Error", "No annotations found to save.")
+            return
 
+        default_path = os.path.join(self.workspace, "annotations.json")
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Annotations", default_path, "JSON Files (*.json)")
+        
+        if file_path:
+            # Prepare data: Convert QRectF objects to lists for JSON compatibility
+            serializable_ann = {}
+            for v_path, frames in self.project_annotations.items():
+                serializable_ann[v_path] = {}
+                for f_idx, boxes in frames.items():
+                    # box is (QRectF, class_id)
+                    serializable_ann[v_path][f_idx] = [[b[0].x(), b[0].y(), b[0].width(), b[0].height(), b[1]] for b in boxes]
+
+            data_to_save = {
+                "class_names": self.edit_classes.text(),
+                "annotations": serializable_ann
+            }
+
+            with open(file_path, 'w') as f:
+                json.dump(data_to_save, f, indent=4)
+            self.log_app.append(f"✅ SYSTEM: Annotations exported to {os.path.basename(file_path)}")
+
+    def load_project_annotations(self):
+        """Loads annotations from JSON and maps them to currently loaded videos."""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Load Annotations", self.workspace, "JSON Files (*.json)")
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+
+            # 1. Restore Class Names
+            if "class_names" in data:
+                self.edit_classes.setText(data["class_names"])
+                self.update_class_dropdown()
+
+            # 2. Identify currently loaded video paths for skipping logic
+            loaded_paths = [self.list_vids.item(i).text() for i in range(self.list_vids.count())]
+            
+            count_imported = 0
+            count_skipped = 0
+
+            # 3. Restore Annotations
+            for v_path, frames in data.get("annotations", {}).items():
+                if v_path in loaded_paths:
+                    # Initialize dict for this video if not exists
+                    self.project_annotations[v_path] = {}
+                    for f_idx, boxes in frames.items():
+                        # Convert list back to (QRectF, class_id)
+                        converted_boxes = []
+                        for b in boxes:
+                            rect = QRectF(b[0], b[1], b[2], b[3])
+                            cid = b[4]
+                            converted_boxes.append((rect, cid))
+                        self.project_annotations[v_path][int(f_idx)] = converted_boxes
+                    count_imported += 1
+                else:
+                    count_skipped += 1
+
+            # 4. Refresh UI
+            if self.current_video in self.project_annotations:
+                self.video_ui.annotations = self.project_annotations[self.current_video]
+                self.video_ui.update()
+            
+            self.on_ann_change() # Update sidebar stats
+            self.log_app.append(f"📂 IMPORT: Linked {count_imported} videos. Skipped {count_skipped} (Not in queue).")
+            QMessageBox.information(self, "Import Successful", f"Loaded data for {count_imported} videos.\nSkipped {count_skipped} videos not found in your sidebar queue.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Load Error", f"Failed to parse annotation file:\n{str(e)}")
 if __name__ == "__main__":
     app = QApplication(sys.argv); w = TAAMMainWindow(); w.show(); sys.exit(app.exec())
