@@ -133,7 +133,7 @@ class ArenaWorker(QThread):
                                 cv2.circle(frame, (int(cx), int(cy)), 2, (0, 0, 255), -1)
 
                                 # REFINED ADAPTIVE LABELS
-                                label = f"A{a_idx+1}:ID{tid+1}"
+                                label = f"{class_names[d['cid']]}:A{a_idx+1}:ID{tid+1}"
                                 font_scale = max(0.35, min(0.5, (x2-x1)/150)) # Smaller base scale
                                 (tw, th), bl = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
                                 cv2.rectangle(frame, (x1, y1 - th - 6), (x1 + tw + 4, y1), color, -1)

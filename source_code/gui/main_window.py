@@ -158,7 +158,20 @@ class TAAMMainWindow(QMainWindow):
         self.spin_max = QSpinBox(); self.spin_max.setRange(1, 999999); self.spin_max.setValue(500); self.spin_sam_batch = QSpinBox(); self.spin_sam_batch.setValue(16); self.spin_sam_chunk = QSpinBox(); self.spin_sam_chunk.setValue(5)
         cfg_lay.addRow("Task:", self.combo_task); cfg_lay.addRow("Model:", self.combo_yolo_ver); cfg_lay.addRow("SAM3 Batch:", self.spin_sam_batch); cfg_lay.addRow("SAM3 Chunk:", self.spin_sam_chunk); cfg_lay.addRow("Base Weights:", self.edit_weights); cfg_lay.addRow("", self._btn("📁 Browse .pt", self.browse_custom_pt)); cfg_lay.addRow("Epochs:", self.spin_epochs); cfg_lay.addRow("Batch:", self.spin_batch_yolo); cfg_lay.addRow("Img Size:", self.spin_imgsz); cfg_lay.addRow("Max Frames:", self.spin_max)
         cfg_box.setLayout(cfg_lay); l2.addWidget(cfg_box); self.update_yolo_dropdown()
-        
+        # Add this under your existing YOLO configuration layout
+        self.combo_bbox_mode = QComboBox()
+        self.combo_bbox_mode.addItems(["Dynamic (From Mask)", "Fixed (Centered)"])
+        self.combo_bbox_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.spin_fixed_bbox = QSpinBox()
+        self.spin_fixed_bbox.setRange(5, 5000)
+        self.spin_fixed_bbox.setValue(60)
+        self.spin_fixed_bbox.setSuffix(" px")
+        self.spin_fixed_bbox.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Add to your form layout (cfg_lay)
+        cfg_lay.addRow("Detection BBox Mode:", self.combo_bbox_mode)
+        cfg_lay.addRow("Fixed Box Size:", self.spin_fixed_bbox)
         br = QHBoxLayout()
         # LAUNCH BUTTON
         self.btn_run_full = self._btn("🚀 LAUNCH FULL AUTO PIPELINE", lambda: self.start_pipeline("FULL")); self.btn_run_full.setFixedHeight(70)
@@ -291,7 +304,7 @@ class TAAMMainWindow(QMainWindow):
             missing = [os.path.basename(v) for v in vids if not any(len(b)>0 for b in self.project_annotations.get(v, {}).values())]
             if missing: QMessageBox.critical(self, "Audit", f"Unannotated:\n" + "\n".join(missing)); return
         classes = [c.strip() for c in self.edit_classes.text().split(',')]
-        config = {"task_type": self.combo_task.currentText(), "yolo_ver": self.combo_yolo_ver.currentText(), "custom_weights": self.edit_weights.text(), "epochs": self.spin_epochs.value(), "yolo_batch": self.spin_batch_yolo.value(), "imgsz": self.spin_imgsz.value(), "max_frames": self.spin_max.value(), "tr": 70, "va": 20, "chunk_duration": 5, "sam_batch": 16, "class_names": classes}
+        config = {"task_type": self.combo_task.currentText(),"bbox_mode": self.combo_bbox_mode.currentText(),"fixed_bbox_size": self.spin_fixed_bbox.value(), "yolo_ver": self.combo_yolo_ver.currentText(), "custom_weights": self.edit_weights.text(), "epochs": self.spin_epochs.value(), "yolo_batch": self.spin_batch_yolo.value(), "imgsz": self.spin_imgsz.value(), "max_frames": self.spin_max.value(), "tr": 70, "va": 20, "chunk_duration": 5, "sam_batch": 16, "class_names": classes}
         self.btn_run_full.setEnabled(False); self.btn_stop.setEnabled(True); self.log_app.clear()
         self.worker = TAAMWorker(vids, self.project_annotations, self.workspace, self.edit_train_name.text(), config, mode)
         self.worker.log_app_signal.connect(self.log_app.append); self.worker.progress_signal.connect(lambda v, m: (self.prog_bar.setValue(v), self.log_app.append(f"STATUS: {m}")))

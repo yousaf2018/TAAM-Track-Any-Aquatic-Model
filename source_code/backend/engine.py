@@ -485,14 +485,17 @@ class TAAMEngine:
             return False
 
     def _generate_yolo_dataset(self, video_info_map, dataset_root, cb):
+        
         all_p = []
 
+        # 1. Collect all valid frames across all videos
         for v_path, csv_p in video_info_map.items():
             if not os.path.exists(csv_p):
                 continue
 
             df = pd.read_csv(csv_p)
             df.columns = df.columns.str.strip()
+            # Ensure images actually exist before adding to pool
             df = df[df["Image_Path"].apply(os.path.exists)]
             if df.empty:
                 continue
@@ -501,70 +504,98 @@ class TAAMEngine:
                 all_p.append((v_path, fid, csv_p))
 
         if not all_p:
+            self.log("ERROR: No valid images found in pool for dataset generation.")
             return None
 
+        # 2. Randomized Sampling based on UI "Max Frames"
         random.shuffle(all_p)
-        sampled = all_p[:self.config['max_frames']]
-        tr_lim = int(len(sampled)*0.7)
-        va_lim = int(len(sampled)*0.9)
+        max_f = self.config.get('max_frames', 500)
+        sampled = all_p[:max_f]
+        
+        # 3. Scientific Splitting based on UI Percentages
+        tr_ratio = self.config.get('tr', 70) / 100.0
+        va_ratio = self.config.get('va', 20) / 100.0
+        tr_lim = int(len(sampled) * tr_ratio)
+        va_lim = tr_lim + int(len(sampled) * va_ratio)
 
         for s in ['train', 'val', 'test']:
             os.makedirs(os.path.join(dataset_root, "images", s), exist_ok=True)
             os.makedirs(os.path.join(dataset_root, "labels", s), exist_ok=True)
 
         class_names = self.config.get('class_names', ['object'])
+        bbox_mode = self.config.get('bbox_mode', 'Dynamic (From Mask)')
+        fixed_size = self.config.get('fixed_bbox_size', 60)
 
+        # 4. Generate Files
         for i, (v_path, f_idx, csv_p) in enumerate(sampled):
             if self.stop_flag:
                 return None
 
-            split = "train" if i < tr_lim else ("val" if i < va_lim else "test")
+            # Determine split folder
+            if i < tr_lim: split = "train"
+            elif i < va_lim: split = "val"
+            else: split = "test"
+
             df = pd.read_csv(csv_p)
+            df.columns = df.columns.str.strip()
             rows = df[df["Global_Frame_ID"] == f_idx]
             if rows.empty:
                 continue
 
             img_src = rows.iloc[0]["Image_Path"]
-            if not os.path.exists(img_src):
-                continue
-
             tmp_img = cv2.imread(img_src)
+            if tmp_img is None: continue
             fh, fw = tmp_img.shape[:2]
 
             vid_name = os.path.splitext(os.path.basename(v_path))[0]
-            base_n = f"{vid_name}_frame_{int(f_idx):06d}.jpg"
+            base_n = f"{vid_name}_frame_{int(f_idx):06d}_{random.randint(100,999)}.jpg"
             shutil.copy(img_src, os.path.join(dataset_root, "images", split, base_n))
 
             with open(os.path.join(dataset_root, "labels", split, base_n.replace(".jpg", ".txt")), "w") as f_lbl:
                 for _, r in rows.iterrows():
-                    poly = str(r["Polygon_Coords"])
-                    cls_id = int(r["Class_ID"])
+                    poly = str(r.get("Polygon_Coords", ""))
+                    cls_id = int(r.get("Class_ID", 0))
 
+                    # Logic A: Segmentation
                     if self.config['task_type'] == "Segmentation":
                         f_lbl.write(
                             f"{cls_id} " +
                             " ".join([f"{float(p.split(',')[0])/fw:.6f} {float(p.split(',')[1])/fh:.6f}"
                                     for p in poly.split(';') if ',' in p]) + "\n"
                         )
+                    # Logic B: Fixed Bounding Box
+                    elif bbox_mode == "Fixed (Centered)":
+                        cx, cy = float(r["Centroid_X"]), float(r["Centroid_Y"])
+                        n_cx = cx / fw
+                        n_cy = cy / fh
+                        n_w = fixed_size / fw
+                        n_h = fixed_size / fh
+                        f_lbl.write(f"{cls_id} {n_cx:.6f} {n_cy:.6f} {n_w:.6f} {n_h:.6f}\n")
+                    
+                    # Logic C: Dynamic Bounding Box (From Polygon)
                     else:
                         coords = [list(map(float, p.split(','))) for p in poly.split(';') if ',' in p]
                         if coords:
-                            x, y = [c[0] for c in coords], [c[1] for c in coords]
-                            bw, bh = max(x)-min(x), max(y)-min(y)
+                            xs, ys = [c[0] for c in coords], [c[1] for c in coords]
+                            min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
+                            bw, bh = max_x - min_x, max_y - min_y
+                            # Normalized YOLO Format: cls cx cy w h
                             f_lbl.write(
-                                f"{cls_id} {(min(x)+bw/2)/fw:.6f} {(min(y)+bh/2)/fh:.6f} {bw/fw:.6f} {bh/fw:.6f}\n"
+                                f"{cls_id} {(min_x+bw/2)/fw:.6f} {(min_y+bh/2)/fh:.6f} {bw/fw:.6f} {bh/fh:.6f}\n"
                             )
 
-            cb(50 + int((i/len(sampled))*40), f"YOLO: {split} ({i}/{len(sampled)})")
+            cb(50 + int((i/len(sampled))*40), f"YOLO: {split} ({i+1}/{len(sampled)})")
 
+        # 5. Write Data.YAML using Absolute Path
         yaml_p = os.path.join(dataset_root, "data.yaml")
         with open(yaml_p, "w") as f:
-            f.write(f"path: {dataset_root}\ntrain: images/train\nval: images/val\ntest: images/test\nnames:\n")
+            f.write(f"path: {os.path.abspath(dataset_root)}\n")
+            f.write(f"train: images/train\nval: images/val\ntest: images/test\n")
+            f.write(f"names:\n")
             for idx, name in enumerate(class_names):
                 f.write(f"  {idx}: {name}\n")
 
         return yaml_p
-
     def _discover_existing_data(self, model_name):
         discovered = {}
         search_path = os.path.join(self.workspace, "Experiments", model_name)
