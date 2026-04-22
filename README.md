@@ -95,15 +95,148 @@ Datasets/
 
 # 🛠️ Installation
 
-```bash
-git clone https://github.com/YourUsername/TAAM.git
-cd TAAM
-conda create -n taam python=3.10
-conda activate taam
-pip install -r requirements.txt
+# TAAM Installation Guide
+
+## 📋 Prerequisites
+
+**Python:** Version 3.10 or 3.11 is highly recommended. (Avoid 3.12 for now due to library compatibility).
+
+**GPU (Optional):** NVIDIA GPU with latest drivers for AI acceleration.
+
+**Hugging Face Account:** You need a User Access Token (Read/Write) to download models.
+
+---
+
+## 🪟 Windows Installation (Recommended)
+
+### Method 1: Automatic (The "Two-Click" Way)
+
+This is the easiest method and includes built-in fixes for the "PyQt6 DLL Conflict" error.
+
+**Step 1: Run INSTALLER.bat**  
+Double-click this file. It will create the virtual environment, install PyTorch (CUDA), and prompt you for your Hugging Face token.
+
+**Step 2: Run RUNNER.bat**  
+Once installation is finished, always use this file to start the app. It isolates the environment to prevent errors caused by other software (like Anaconda).
+
+---
+
+### Method 2: Manual PowerShell (If BAT files fail)
+
+If the `.bat` files do not open, use the manual terminal approach:
+
+#### Open PowerShell in the project folder
+
+Allow script execution (run this once):
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+```
+
+#### Create and activate environment:
+```powershell
+python -m venv sam3_tracker_venv
+.\sam3_tracker_venv\Scripts\Activate.ps1
+```
+
+#### Install dependencies:
+```powershell
+python -m pip install --upgrade pip
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+python -m pip install -r requirements-win.txt
+python -m pip install -e ./sam3
+```
+
+#### Critical PyQt6 Fix (If you get DLL errors):
+```powershell
+python -m pip uninstall -y PyQt6 PyQt6-Qt6 PyQt6-sip
+python -m pip install PyQt6==6.6.1 PyQt6-Qt6==6.6.1 --no-cache-dir
 ```
 
 ---
+
+## 🐧 Linux Installation
+
+
+
+### Method 1: Manual Terminal
+
+```bash
+# 1. Create venv
+python3 -m venv sam3_tracker_venv
+source sam3_tracker_venv/bin/activate
+
+# 2. Install Torch
+pip install torch torchvision torchaudio
+
+# 3. Install Requirements
+pip install -r requirements.txt
+pip install -e ./sam3
+
+# 4. Login to Hugging Face
+pip install huggingface_hub
+huggingface-cli login
+```
+
+---
+
+## 🛠 Troubleshooting (Windows)
+
+### 1. Error: ImportError: DLL load failed while importing QtWidgets
+
+This is the most common Windows error. It happens because other software (Anaconda, OBS, Drivers) is conflicting with Qt.
+
+**Fix A:** Always use RUNNER.bat to launch the app. It hides conflicting system paths.
+
+**Fix B:** Install the Microsoft Visual C++ Redistributable and restart your computer.
+
+**Fix C:** Open RUNNER.bat and ensure the PATH isolation line is active.
+
+---
+
+### 2. Error: huggingface_hub.login not found
+
+Fix: Your version of the hub is too old. Run:
+```powershell
+.\sam3_tracker_venv\Scripts\python.exe -m pip install --upgrade "huggingface_hub>=0.23.0"
+```
+
+---
+
+### 3. Python is not recognized
+
+Fix: During Python installation, you must check:
+
+✔ "Add Python to PATH"
+
+If missed:
+- Uninstall Python
+- Reinstall and enable PATH option
+
+---
+
+## 🚀 How to Run (Daily Use)
+
+### Windows
+Double-click **RUNNER.bat**. This is programmed to handle all path conflicts and launch `main.py` instantly.
+
+### Linux
+```bash
+source sam3_tracker_venv/bin/activate
+python main.py
+```
+
+---
+
+## ✅ Verifying GPU Support
+
+Once the app is running, verify GPU usage:
+
+```python
+import torch
+print(f"CUDA Available: {torch.cuda.is_available()}")
+```
+
+
 
 # 📄 License
 MIT License
