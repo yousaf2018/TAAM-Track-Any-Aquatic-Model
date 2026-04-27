@@ -15,3 +15,6 @@ torchvision
 einops  
 decord
 openpyxl
+triton-windows
+pycocotools
+huggingface_hub

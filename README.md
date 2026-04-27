@@ -95,16 +95,177 @@ Datasets/
 
 # 🛠️ Installation
 
+## 1. 📥 Initial Setup (Common for All)
+
+Before choosing an installation method, you must clone the repository and enter the correct folder.
+
+Open your terminal (PowerShell on Windows, Terminal on Linux) and run:
+
 ```bash
-git clone https://github.com/YourUsername/TAAM.git
-cd TAAM
-conda create -n taam python=3.10
-conda activate taam
-pip install -r requirements.txt
+git clone https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model.git
+cd TAAM-Track-Any-Aquatic-Model/source_code
 ```
 
 ---
 
+## 2. 🪟 Windows Installation
+
+### Method A: Automated (Recommended)
+
+We provide two script files that handle all the complex logic, including finding the right CUDA version and fixing PyQt6 errors.
+
+**Step 1: Run INSTALLER.bat**  
+Double-click it. It will ask for your Hugging Face token and set up the environment.
+
+**Step 2: Run RUNNER.bat**  
+Always use this to start the app. It prevents "DLL Load Failed" errors.
+
+---
+
+### Method B: Manual Installation (Step-by-Step)
+
+If the `.bat` files fail, follow these steps exactly in PowerShell:
+
+---
+
+### 1. Create the Environment
+```powershell
+python -m venv sam3_tracker_venv
+.\sam3_tracker_venv\Scripts\Activate.ps1
+```
+
+---
+
+### 2. Install PyTorch with CUDA (Compatibility Loop)
+
+If you have an NVIDIA GPU, try these versions one by one until one works.
+
+#### Try CUDA 12.1 (Latest)
+```powershell
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+python -c "import torch; print('CUDA 12.1 Working:', torch.cuda.is_available())"
+```
+
+If result is `False`, try CUDA 11.8:
+
+```powershell
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+python -c "import torch; print('CUDA 11.8 Working:', torch.cuda.is_available())"
+```
+
+---
+
+### 3. Install Dependencies
+```powershell
+pip install -r requirements-win.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -e ./sam3
+```
+
+---
+
+### 4. Hugging Face Login (Manual Token Method)
+Replace `YOUR_TOKEN_HERE` with your actual token:
+
+```powershell
+python -c "from huggingface_hub import login; login(token='YOUR_TOKEN_HERE')"
+```
+
+---
+
+### 5. Fix PyQt6 DLL Issues
+If you see `ImportError: DLL load failed`, run:
+
+```powershell
+pip uninstall -y PyQt6 PyQt6-Qt6 PyQt6-sip
+pip install PyQt6==6.6.1 PyQt6-Qt6==6.6.1 --no-cache-dir
+```
+
+---
+
+## 3. 🐧 Linux Installation
+
+Open terminal in the `source_code` directory:
+
+---
+
+### 1. Create and Activate Environment
+```bash
+python3 -m venv sam3_tracker_venv
+source sam3_tracker_venv/bin/activate
+```
+
+---
+
+### 2. Install PyTorch
+For Linux with NVIDIA GPU:
+```bash
+pip install torch torchvision torchaudio
+```
+
+---
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+pip install -e ./sam3
+```
+
+---
+
+### 4. Hugging Face Login
+```bash
+huggingface-cli login
+```
+
+Or use token directly:
+
+```bash
+python3 -c "from huggingface_hub import login; login(token='YOUR_TOKEN_HERE')"
+```
+
+---
+
+## 🛠️ Summary of Commands for Quick Copy
+
+| Task | Windows (PowerShell) | Linux (Terminal) |
+|------|----------------------|------------------|
+| Clone | git clone https://github.com/yousaf2018/TAAM-Track-Any-Aquatic-Model.git | Same |
+| Venv | python -m venv sam3_tracker_venv | python3 -m venv sam3_tracker_venv |
+| Activate | .\sam3_tracker_venv\Scripts\Activate.ps1 | source sam3_tracker_venv/bin/activate |
+| Torch | Use cu121 or cu118 URLs | pip install torch |
+| Requirements | pip install -r requirements-win.txt | pip install -r requirements.txt |
+| Local Mod | pip install -e ./sam3 | Same |
+| Launch | python main.py | python3 main.py |
+
+---
+
+## ❓ Troubleshooting
+
+### DLL Load Failed (Windows)
+This is caused by conflicting Qt installations (Anaconda, OBS, drivers).
+
+**Solution:** Use RUNNER.bat. If running manually:
+
+```powershell
+$env:PATH = "C:\Windows\system32;C:\Windows;D:\path\to\your\project\sam3_tracker_venv\Scripts"
+python main.py
+```
+
+---
+
+### Hugging Face Login Hangs
+Use non-interactive login:
+
+```bash
+python -c "from huggingface_hub import login; login(token='your_token_here')"
+```
+
+---
+
+### CUDA returns False
+Install latest NVIDIA drivers from nvidia.com and restart your system.
+
+****
 # 📄 License
 MIT License
 
